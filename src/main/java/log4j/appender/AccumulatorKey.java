@@ -5,8 +5,8 @@ import org.apache.log4j.spi.LoggingEvent;
 
 public class AccumulatorKey {
 
-    private String name;
-    private String lineNumber;
+    private final String name;
+    private final String lineNumber;
 
     public AccumulatorKey(LoggingEvent event) {
         LocationInfo locationInfo = event.getLocationInformation();

@@ -1,24 +1,37 @@
 package log4j.appender;
 
-import org.apache.log4j.AppenderSkeleton;
+import org.apache.log4j.net.SMTPAppender;
 import org.apache.log4j.spi.LoggingEvent;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 
-public class AccumulatingSmtpAppender extends AppenderSkeleton {
+public class AccumulatingSmtpAppender extends SMTPAppender {
 
-    private ConcurrentHashMap<AccumulatorKey, AccumulatorValue> buffer =
-            new ConcurrentHashMap<AccumulatorKey, AccumulatorValue>();
-
-    public final EmailDispatcher emailDispatcher;
+    public static final long EMAIL_SEND_INTERVAL = TimeUnit.SECONDS.toMillis(5L);
+    private final Map<AccumulatorKey, AccumulatorValue> buffer = new HashMap<AccumulatorKey, AccumulatorValue>();
+    private EmailDispatcher emailDispatcher;
+    private boolean activated = false;
 
     public AccumulatingSmtpAppender() {
         super();
-        emailDispatcher = new EmailDispatcher(this);
-        new Thread(emailDispatcher).start();
     }
 
-    protected void append(LoggingEvent event) {
+    @Override
+    public void activateOptions() {
+        super.activateOptions();
+        super.cb = null;
+        EmailSender emailSender = new EmailSender(super.layout, super.msg);
+        emailDispatcher = new EmailDispatcher(emailSender);
+        new Thread(emailDispatcher).start();
+        activated = true;
+    }
+
+    @Override
+    public void append(LoggingEvent event) {
         if (!checkEntryConditions()) {
             return;
         }
@@ -34,26 +47,35 @@ public class AccumulatingSmtpAppender extends AppenderSkeleton {
     }
 
     private void accumulateEvent(LoggingEvent event) {
-        AccumulatorKey key = new AccumulatorKey(event);
-        if (buffer.containsKey(key)) buffer.get(key).update(event);
-        else buffer.put(key, new AccumulatorValue(event, this));
+        final AccumulatorKey key = new AccumulatorKey(event);
+        synchronized (buffer) {
+            if (buffer.containsKey(key)) {
+                AccumulatorValue accumulatorValue = buffer.get(key);
+                buffer.put(key, accumulatorValue.update(event));
+            }
+            else {
+                final AccumulatorValue value = new AccumulatorValue(event);
+                buffer.put(key, value);
+                Timer timer = new Timer();
+                timer.schedule(new TimerTask() {
+                    public void run() {
+                        synchronized (buffer) {
+                            AccumulatorValue accumulatorValue = buffer.remove(key);
+                            emailDispatcher.add(accumulatorValue);
+                        }
+                    }
+                }, EMAIL_SEND_INTERVAL);
+            }
+        }
     }
 
-    private boolean checkEntryConditions() {
-        return true;
+    @Override
+    protected boolean checkEntryConditions() {
+        return activated;
     }
 
+    @Override
     public void close() {
         closed = true;
-    }
-
-    public boolean requiresLayout() {
-        return true;
-    }
-
-    public void removeValue(AccumulatorValue accumulatorValue) {
-        AccumulatorKey key = new AccumulatorKey(accumulatorValue.getLastEvent());
-        boolean removed = buffer.remove(key, accumulatorValue);
-        if (!removed) throw new IllegalStateException("Couldn't remove event " + accumulatorValue + " with key " + key);
     }
 }

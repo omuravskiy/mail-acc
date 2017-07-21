@@ -3,34 +3,34 @@ package log4j.appender;
 import org.apache.log4j.spi.LoggingEvent;
 
 import java.util.Date;
-import java.util.Timer;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class AccumulatorValue {
     private final long firstEventTimestamp;
-    private AtomicReference<LoggingEvent> lastEvent;
-    private AtomicLong eventCount = new AtomicLong(1L);
+    private final LoggingEvent lastEvent;
+    private final long eventCount;
 
-    public AccumulatorValue(LoggingEvent event, AccumulatingSmtpAppender accumulatingSmtpAppender) {
-        this.lastEvent = new AtomicReference<LoggingEvent>(event);
+    public AccumulatorValue(LoggingEvent event) {
+        this.lastEvent = event;
         firstEventTimestamp = event.getTimeStamp();
-        Timer timer = new Timer();
-        timer.schedule(new SendEmailTask(this, accumulatingSmtpAppender), TimeUnit.SECONDS.toMillis(5L));
+        eventCount = 1;
     }
 
-    public synchronized void update(LoggingEvent event) {
-        lastEvent.set(event);
-        eventCount.incrementAndGet();
+    private AccumulatorValue(long firstEventTimestamp, LoggingEvent event, long eventCount) {
+        this.firstEventTimestamp = firstEventTimestamp;
+        this.lastEvent = event;
+        this.eventCount = eventCount;
+    }
+
+    synchronized public AccumulatorValue update(LoggingEvent event) {
+        return new AccumulatorValue(firstEventTimestamp, event, eventCount + 1);
     }
 
     public LoggingEvent getLastEvent() {
-        return lastEvent.get();
+        return lastEvent;
     }
 
-    public Long getEventCount() {
-        return eventCount.get();
+    public long getEventCount() {
+        return eventCount;
     }
 
     public Date getFirstEventTimestamp() {
