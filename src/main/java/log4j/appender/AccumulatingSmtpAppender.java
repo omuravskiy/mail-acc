@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit;
 
 public class AccumulatingSmtpAppender extends SMTPAppender {
 
-    public static final long EMAIL_SEND_INTERVAL = TimeUnit.SECONDS.toMillis(5L);
     private final Map<AccumulatorKey, AccumulatorValue> buffer = new HashMap<AccumulatorKey, AccumulatorValue>();
+    public static final long EMAIL_SEND_INTERVAL = TimeUnit.SECONDS.toMillis(61L);
     private EmailDispatcher emailDispatcher;
     private boolean activated = false;
 
