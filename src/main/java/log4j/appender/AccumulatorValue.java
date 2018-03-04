@@ -3,30 +3,27 @@ package log4j.appender;
 import org.apache.log4j.spi.LoggingEvent;
 
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 
 public class AccumulatorValue {
     private final long firstEventTimestamp;
-    private final LoggingEvent lastEvent;
-    private final long eventCount;
+    private final List<LoggingEvent> events = new LinkedList<LoggingEvent>();
+    private Long eventCount;
 
     public AccumulatorValue(LoggingEvent event) {
-        this.lastEvent = event;
+        events.add(event);
         firstEventTimestamp = event.getTimeStamp();
-        eventCount = 1;
+        eventCount = 1L;
     }
 
-    private AccumulatorValue(long firstEventTimestamp, LoggingEvent event, long eventCount) {
-        this.firstEventTimestamp = firstEventTimestamp;
-        this.lastEvent = event;
-        this.eventCount = eventCount;
+    synchronized public void update(LoggingEvent event) {
+        events.add(event);
+        eventCount++;
     }
 
-    synchronized public AccumulatorValue update(LoggingEvent event) {
-        return new AccumulatorValue(firstEventTimestamp, event, eventCount + 1);
-    }
-
-    public LoggingEvent getLastEvent() {
-        return lastEvent;
+    public List<LoggingEvent> getEvents() {
+        return events;
     }
 
     public long getEventCount() {

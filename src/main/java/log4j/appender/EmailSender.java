@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.Date;
+import java.util.List;
 
 public class EmailSender {
     private final Layout layout;
@@ -35,7 +36,7 @@ public class EmailSender {
             mp.addBodyPart(eventPart);
         }
 
-        StringBuilder eventText = prepareEventText(value.getLastEvent());
+        StringBuilder eventText = prepareEventText(value.getEvents());
         MimeBodyPart eventPart = encodeMimePart(eventText);
         mp.addBodyPart(eventPart);
 
@@ -50,9 +51,9 @@ public class EmailSender {
         return new StringBuilder("The following error had occured ")
                 .append(value.getEventCount())
                 .append(" times.\r\n")
-                .append("The first occurence was at ")
+                .append("The first occurence was on ")
                 .append(value.getFirstEventTimestamp())
-                .append("\r\n");
+                .append("\r\n\r\n");
     }
 
     private MimeBodyPart encodeMimePart(StringBuilder emailText) throws MessagingException {
@@ -86,20 +87,21 @@ public class EmailSender {
         return new MimeBodyPart(headers, os.toByteArray());
     }
 
-    private StringBuilder prepareEventText(LoggingEvent event) {
+    private StringBuilder prepareEventText(List<LoggingEvent> events) {
         StringBuilder stringBuilder = new StringBuilder();
 
         String header = layout.getHeader();
         if (header != null) stringBuilder.append(header);
 
-        stringBuilder.append(layout.format(event));
-
-        if (layout.ignoresThrowable()) {
-            String[] throwableStrRep = event.getThrowableStrRep();
-            if (throwableStrRep != null) {
-                for (String s : throwableStrRep) {
-                    stringBuilder.append(s);
-                    stringBuilder.append("\r\n");
+        for (LoggingEvent event : events) {
+            stringBuilder.append(layout.format(event));
+            if (layout.ignoresThrowable()) {
+                String[] throwableStrRep = event.getThrowableStrRep();
+                if (throwableStrRep != null) {
+                    for (String s : throwableStrRep) {
+                        stringBuilder.append(s);
+                        stringBuilder.append("\r\n");
+                    }
                 }
             }
         }
